@@ -410,10 +410,22 @@ func (c *ClaudeAI) makeRequest(method, endpoint string, data interface{}) (*http
 	}
 	req.Header.Set("Cookie", fmt.Sprintf("sessionKey=%s", sessionKey))
 
+	c.logger.WithFields(logrus.Fields{
+		"method":  method,
+		"url":     url,
+		"headers": req.Header,
+		"body":    data,
+	}).Debug("Making request")
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+
+	c.logger.WithFields(logrus.Fields{
+		"status":  resp.StatusCode,
+		"headers": resp.Header,
+	}).Debug("Received response")
 
 	if resp.StatusCode >= 400 {
 		defer resp.Body.Close()
@@ -422,4 +434,36 @@ func (c *ClaudeAI) makeRequest(method, endpoint string, data interface{}) (*http
 	}
 
 	return resp, nil
+}
+
+func (c *ClaudeAI) handleHTTPError(resp *http.Response) error {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read error response body: %v", err)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"status": resp.StatusCode,
+		"body":   string(body),
+	}).Error("HTTP error")
+
+	if resp.StatusCode == 403 {
+		return fmt.Errorf("received a 403 Forbidden error")
+	} else if resp.StatusCode == 429 {
+		var errorData map[string]interface{}
+		if err := json.Unmarshal(body, &errorData); err == nil {
+			if errorMsg, ok := errorData["error"].(map[string]interface{})["message"].(string); ok {
+				var resetsAt map[string]interface{}
+				if err := json.Unmarshal([]byte(errorMsg), &resetsAt); err == nil {
+					if resetsAtUnix, ok := resetsAt["resetsAt"].(float64); ok {
+						resetsAtTime := time.Unix(int64(resetsAtUnix), 0).UTC()
+						return fmt.Errorf("message limit exceeded. Try again after %s", resetsAtTime.Format(time.RFC1123))
+					}
+				}
+			}
+		}
+		return fmt.Errorf("HTTP 429: Too Many Requests. Failed to parse error response")
+	}
+
+	return fmt.Errorf("API request failed with status code %d: %s", resp.StatusCode, string(body))
 }
