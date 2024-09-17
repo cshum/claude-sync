@@ -63,16 +63,14 @@ func login(c *cli.Context) error {
 
 func logout(c *cli.Context) error {
 	cfg := config.GetConfig()
-	// Implement ClearAllSessionKeys in the Config struct
-	// cfg.ClearAllSessionKeys()
+	cfg.ClearAllSessionKeys() // Implement this method in the Config struct
 	fmt.Println("Logged out from all providers successfully.")
 	return nil
 }
 
 func list(c *cli.Context) error {
 	cfg := config.GetConfig()
-	// Implement GetProvidersWithSessionKeys in the Config struct
-	providers := []string{"claude.ai"} // Placeholder
+	providers := cfg.GetProvidersWithSessionKeys() // Implement this method in the Config struct
 	if len(providers) == 0 {
 		fmt.Println("No authenticated providers found.")
 	} else {

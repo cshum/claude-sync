@@ -2,23 +2,23 @@ package sync
 
 import (
 	"github.com/cshum/claude-sync/v2/internal/config"
-	"github.com/cshum/claude-sync/v2/internal/provider"
+	"github.com/cshum/claude-sync/v2/providerapi"
 	"github.com/urfave/cli/v2"
 )
 
 type SyncManager struct {
-	provider provider.Provider
+	provider providerapi.Provider
 	config   *config.Config
 }
 
-func NewSyncManager(p provider.Provider, c *config.Config) *SyncManager {
+func NewSyncManager(p providerapi.Provider, c *config.Config) *SyncManager {
 	return &SyncManager{
 		provider: p,
 		config:   c,
 	}
 }
 
-func (sm *SyncManager) Sync(localFiles map[string]string, remoteFiles []provider.File) error {
+func (sm *SyncManager) Sync(localFiles map[string]string, remoteFiles []providerapi.File) error {
 	// Implement sync logic
 	return nil
 }

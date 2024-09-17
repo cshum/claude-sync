@@ -2,6 +2,7 @@ package project
 
 import (
 	"fmt"
+	"github.com/cshum/claude-sync/v2/providerapi"
 	"os"
 	"path/filepath"
 
@@ -193,7 +194,7 @@ func setProject(c *cli.Context) error {
 		return err
 	}
 
-	var selectableProjects []provider.Project
+	var selectableProjects []providerapi.Project
 	if showAll {
 		selectableProjects = projects
 	} else {

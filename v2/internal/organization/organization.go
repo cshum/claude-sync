@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/cshum/claude-sync/v2/internal/config"
 	"github.com/cshum/claude-sync/v2/internal/provider"
+	"github.com/cshum/claude-sync/v2/providerapi"
 	"github.com/urfave/cli/v2"
 )
 
@@ -77,7 +78,7 @@ func setOrganization(c *cli.Context) error {
 		return err
 	}
 
-	var selectedOrg provider.Organization
+	var selectedOrg providerapi.Organization
 	orgID := c.String("org-id")
 	if orgID != "" {
 		for _, org := range organizations {

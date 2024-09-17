@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -138,6 +139,25 @@ func (c *Config) GetSessionKey(provider string) (string, time.Time, error) {
 	}
 
 	return key, expiry, nil
+}
+
+func (c *Config) ClearAllSessionKeys() {
+	for key := range c.GlobalConfig {
+		if strings.HasSuffix(key, "_session_key") {
+			delete(c.GlobalConfig, key)
+		}
+	}
+	c.saveGlobalConfig()
+}
+
+func (c *Config) GetProvidersWithSessionKeys() []string {
+	var providers []string
+	for key := range c.GlobalConfig {
+		if strings.HasSuffix(key, "_session_key") {
+			providers = append(providers, strings.TrimSuffix(key, "_session_key"))
+		}
+	}
+	return providers
 }
 
 func Command() *cli.Command {
