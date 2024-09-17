@@ -3,16 +3,19 @@ package claudeai
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/cshum/claude-sync/v2/internal/config"
 	"github.com/cshum/claude-sync/v2/providerapi"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/text/encoding/charmap"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type ClaudeAI struct {
@@ -106,16 +109,15 @@ func (c *ClaudeAI) getSessionKey() (string, error) {
 }
 
 func (c *ClaudeAI) GetOrganizations() ([]providerapi.Organization, error) {
-	resp, err := c.makeRequest("GET", "/organizations", nil)
+	body, err := c.makeRequest("GET", "/organizations", nil)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	var orgs []providerapi.Organization
-	err = json.NewDecoder(resp.Body).Decode(&orgs)
+	err = json.Unmarshal(body, &orgs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error unmarshaling organizations: %v", err)
 	}
 
 	return orgs, nil
@@ -123,14 +125,13 @@ func (c *ClaudeAI) GetOrganizations() ([]providerapi.Organization, error) {
 
 func (c *ClaudeAI) GetProjects(organizationID string, includeArchived bool) ([]providerapi.Project, error) {
 	url := fmt.Sprintf("/organizations/%s/projects", organizationID)
-	resp, err := c.makeRequest("GET", url, nil)
+	body, err := c.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	var projects []providerapi.Project
-	err = json.NewDecoder(resp.Body).Decode(&projects)
+	err = json.Unmarshal(body, &projects)
 	if err != nil {
 		return nil, err
 	}
@@ -150,14 +151,13 @@ func (c *ClaudeAI) GetProjects(organizationID string, includeArchived bool) ([]p
 
 func (c *ClaudeAI) ListFiles(organizationID, projectID string) ([]providerapi.File, error) {
 	url := fmt.Sprintf("/organizations/%s/projects/%s/docs", organizationID, projectID)
-	resp, err := c.makeRequest("GET", url, nil)
+	body, err := c.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	var files []providerapi.File
-	err = json.NewDecoder(resp.Body).Decode(&files)
+	err = json.Unmarshal(body, &files)
 	if err != nil {
 		return nil, err
 	}
@@ -197,14 +197,13 @@ func (c *ClaudeAI) CreateProject(organizationID, name, description string) (prov
 		"description": description,
 		"is_private":  true,
 	}
-	resp, err := c.makeRequest("POST", url, data)
+	body, err := c.makeRequest("POST", url, data)
 	if err != nil {
 		return providerapi.Project{}, err
 	}
-	defer resp.Body.Close()
 
 	var project providerapi.Project
-	err = json.NewDecoder(resp.Body).Decode(&project)
+	err = json.Unmarshal(body, &project)
 	if err != nil {
 		return providerapi.Project{}, err
 	}
@@ -214,14 +213,13 @@ func (c *ClaudeAI) CreateProject(organizationID, name, description string) (prov
 
 func (c *ClaudeAI) GetChatConversations(organizationID string) ([]providerapi.ChatConversation, error) {
 	url := fmt.Sprintf("/organizations/%s/chat_conversations", organizationID)
-	resp, err := c.makeRequest("GET", url, nil)
+	body, err := c.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	var conversations []providerapi.ChatConversation
-	err = json.NewDecoder(resp.Body).Decode(&conversations)
+	err = json.Unmarshal(body, &conversations)
 	if err != nil {
 		return nil, err
 	}
@@ -231,14 +229,13 @@ func (c *ClaudeAI) GetChatConversations(organizationID string) ([]providerapi.Ch
 
 func (c *ClaudeAI) GetPublishedArtifacts(organizationID string) ([]providerapi.PublishedArtifact, error) {
 	url := fmt.Sprintf("/organizations/%s/published_artifacts", organizationID)
-	resp, err := c.makeRequest("GET", url, nil)
+	body, err := c.makeRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	var artifacts []providerapi.PublishedArtifact
-	err = json.NewDecoder(resp.Body).Decode(&artifacts)
+	err = json.Unmarshal(body, &artifacts)
 	if err != nil {
 		return nil, err
 	}
@@ -248,14 +245,13 @@ func (c *ClaudeAI) GetPublishedArtifacts(organizationID string) ([]providerapi.P
 
 func (c *ClaudeAI) GetChatConversation(organizationID, conversationID string) (providerapi.ChatConversation, error) {
 	url := fmt.Sprintf("/organizations/%s/chat_conversations/%s?rendering_mode=raw", organizationID, conversationID)
-	resp, err := c.makeRequest("GET", url, nil)
+	body, err := c.makeRequest("GET", url, nil)
 	if err != nil {
 		return providerapi.ChatConversation{}, err
 	}
-	defer resp.Body.Close()
 
 	var conversation providerapi.ChatConversation
-	err = json.NewDecoder(resp.Body).Decode(&conversation)
+	err = json.Unmarshal(body, &conversation)
 	if err != nil {
 		return providerapi.ChatConversation{}, err
 	}
@@ -293,14 +289,13 @@ func (c *ClaudeAI) CreateChat(organizationID, chatName, projectUUID string) (pro
 		"name":         chatName,
 		"project_uuid": projectUUID,
 	}
-	resp, err := c.makeRequest("POST", url, data)
+	body, err := c.makeRequest("POST", url, data)
 	if err != nil {
 		return providerapi.ChatConversation{}, err
 	}
-	defer resp.Body.Close()
 
 	var conversation providerapi.ChatConversation
-	err = json.NewDecoder(resp.Body).Decode(&conversation)
+	err = json.Unmarshal(body, &conversation)
 	if err != nil {
 		return providerapi.ChatConversation{}, err
 	}
@@ -384,7 +379,7 @@ func (c *ClaudeAI) SendMessage(organizationID, chatID, prompt, timezone string) 
 	return eventChan, nil
 }
 
-func (c *ClaudeAI) makeRequest(method, endpoint string, data interface{}) (*http.Response, error) {
+func (c *ClaudeAI) makeRequest(method, endpoint string, data interface{}) ([]byte, error) {
 	url := c.config.Get("claude_api_url").(string) + endpoint
 	var body io.Reader
 	if data != nil {
@@ -414,44 +409,68 @@ func (c *ClaudeAI) makeRequest(method, endpoint string, data interface{}) (*http
 		"method":  method,
 		"url":     url,
 		"headers": req.Header,
-		"body":    data,
 	}).Debug("Making request")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	c.logger.WithFields(logrus.Fields{
 		"status":  resp.StatusCode,
 		"headers": resp.Header,
 	}).Debug("Received response")
 
-	if resp.StatusCode >= 400 {
-		defer resp.Body.Close()
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status code %d: %s", resp.StatusCode, string(bodyBytes))
+	var reader io.Reader
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error creating gzip reader: %v", err)
+		}
+		defer gzReader.Close()
+		reader = gzReader
+	} else {
+		reader = resp.Body
 	}
 
-	return resp, nil
+	respBody, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, c.handleHTTPError(resp.StatusCode, respBody)
+	}
+
+	return respBody, nil
 }
 
-func (c *ClaudeAI) handleHTTPError(resp *http.Response) error {
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read error response body: %v", err)
+func (c *ClaudeAI) handleHTTPError(statusCode int, body []byte) error {
+	contentStr := string(body)
+
+	// Try to decode as UTF-8
+	if !utf8.Valid(body) {
+		// If UTF-8 decoding fails, try to decode as ISO-8859-1 (Latin-1)
+		decoder := charmap.ISO8859_1.NewDecoder()
+		decodedBody, err := decoder.Bytes(body)
+		if err != nil {
+			c.logger.WithError(err).Error("Failed to decode response body")
+		} else {
+			contentStr = string(decodedBody)
+		}
 	}
 
 	c.logger.WithFields(logrus.Fields{
-		"status": resp.StatusCode,
-		"body":   string(body),
+		"status": statusCode,
+		"body":   contentStr,
 	}).Error("HTTP error")
 
-	if resp.StatusCode == 403 {
-		return fmt.Errorf("received a 403 Forbidden error")
-	} else if resp.StatusCode == 429 {
+	if statusCode == 403 {
+		return fmt.Errorf("received a 403 Forbidden error. Please check your session key")
+	} else if statusCode == 429 {
 		var errorData map[string]interface{}
-		if err := json.Unmarshal(body, &errorData); err == nil {
+		if err := json.Unmarshal([]byte(contentStr), &errorData); err == nil {
 			if errorMsg, ok := errorData["error"].(map[string]interface{})["message"].(string); ok {
 				var resetsAt map[string]interface{}
 				if err := json.Unmarshal([]byte(errorMsg), &resetsAt); err == nil {
@@ -465,5 +484,5 @@ func (c *ClaudeAI) handleHTTPError(resp *http.Response) error {
 		return fmt.Errorf("HTTP 429: Too Many Requests. Failed to parse error response")
 	}
 
-	return fmt.Errorf("API request failed with status code %d: %s", resp.StatusCode, string(body))
+	return fmt.Errorf("API request failed with status code %d: %s", statusCode, contentStr)
 }
