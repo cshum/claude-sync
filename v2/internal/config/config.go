@@ -37,7 +37,7 @@ func GetConfig() *Config {
 
 		// Set default values if they don't exist
 		if instance.Get("claude_api_url") == nil {
-			instance.Set("claude_api_url", "https://api.claude.ai", false)
+			instance.Set("claude_api_url", "https://api.claude.ai/api", false)
 		}
 		if instance.Get("active_provider") == nil {
 			instance.Set("active_provider", "claude.ai", false)
