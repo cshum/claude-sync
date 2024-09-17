@@ -1,10 +1,7 @@
 package provider
 
 import (
-	"fmt"
 	"time"
-
-	"github.com/cshum/claude-sync/v2/internal/config"
 )
 
 type Provider interface {
@@ -65,13 +62,4 @@ type MessageEvent struct {
 	Completion string
 	Error      string
 	Done       bool
-}
-
-func GetProvider(providerName string, cfg *config.Config) (Provider, error) {
-	switch providerName {
-	case "claude.ai":
-		return NewClaudeAIProvider(cfg), nil
-	default:
-		return nil, fmt.Errorf("unsupported provider: %s", providerName)
-	}
 }

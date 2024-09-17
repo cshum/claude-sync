@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -25,15 +24,6 @@ func main() {
 			organization.Command(),
 			project.Command(),
 			sync.Command(),
-			{
-				Name:  "upgrade",
-				Usage: "Upgrade ClaudeSync to the latest version",
-				Action: func(c *cli.Context) error {
-					fmt.Println("Upgrading ClaudeSync...")
-					// Implement upgrade logic here
-					return nil
-				},
-			},
 		},
 	}
 
