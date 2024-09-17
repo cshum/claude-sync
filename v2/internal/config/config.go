@@ -21,11 +21,17 @@ var instance *Config
 
 func GetConfig() *Config {
 	if instance == nil {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			panic(fmt.Sprintf("Failed to get user home directory: %v", err))
+		}
+
 		instance = &Config{
 			GlobalConfig: make(map[string]interface{}),
 			LocalConfig:  make(map[string]interface{}),
-			configDir:    filepath.Join(os.Getenv("HOME"), ".claudesync_v2"),
+			configDir:    filepath.Join(homeDir, ".claudesync_v2"),
 		}
+		instance.ensureConfigDir()
 		instance.loadGlobalConfig()
 		instance.loadLocalConfig()
 
@@ -40,11 +46,31 @@ func GetConfig() *Config {
 	return instance
 }
 
+func (c *Config) ensureConfigDir() {
+	err := os.MkdirAll(c.configDir, 0755)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create config directory: %v", err))
+	}
+}
+
 func (c *Config) loadGlobalConfig() {
 	configFile := filepath.Join(c.configDir, "config.json")
 	data, err := os.ReadFile(configFile)
-	if err == nil {
-		json.Unmarshal(data, &c.GlobalConfig)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// If the file doesn't exist, create an empty one
+			err = os.WriteFile(configFile, []byte("{}"), 0644)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to create config file: %v", err))
+			}
+		} else {
+			panic(fmt.Sprintf("Failed to read config file: %v", err))
+		}
+	} else {
+		err = json.Unmarshal(data, &c.GlobalConfig)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to unmarshal config file: %v", err))
+		}
 	}
 }
 
