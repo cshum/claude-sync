@@ -24,7 +24,7 @@ func GetConfig() *Config {
 		instance = &Config{
 			GlobalConfig: make(map[string]interface{}),
 			LocalConfig:  make(map[string]interface{}),
-			configDir:    filepath.Join(os.Getenv("HOME"), ".claudesync"),
+			configDir:    filepath.Join(os.Getenv("HOME"), ".claudesync_v2"),
 		}
 		instance.loadGlobalConfig()
 		instance.loadLocalConfig()
