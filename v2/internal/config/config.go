@@ -106,15 +106,17 @@ func (c *Config) saveLocalConfig() error {
 }
 
 func (c *Config) SetSessionKey(provider, sessionKey string, expiry time.Time) error {
-	return c.Set(fmt.Sprintf("%s_session_key", provider), map[string]string{
+	c.GlobalConfig[fmt.Sprintf("%s_session_key", provider)] = map[string]string{
 		"key":    sessionKey,
 		"expiry": expiry.Format(time.RFC3339),
-	}, false)
+	}
+	return c.saveGlobalConfig()
 }
 
 func (c *Config) GetSessionKey(provider string) (string, time.Time, error) {
-	value := c.Get(fmt.Sprintf("%s_session_key", provider))
-	if value == nil {
+	key := fmt.Sprintf("%s_session_key", provider)
+	value, ok := c.GlobalConfig[key]
+	if !ok {
 		return "", time.Time{}, fmt.Errorf("no session key found for provider %s", provider)
 	}
 
@@ -123,7 +125,7 @@ func (c *Config) GetSessionKey(provider string) (string, time.Time, error) {
 		return "", time.Time{}, fmt.Errorf("invalid session key format for provider %s", provider)
 	}
 
-	key, ok := sessionKeyMap["key"].(string)
+	sessionKey, ok := sessionKeyMap["key"].(string)
 	if !ok {
 		return "", time.Time{}, fmt.Errorf("invalid session key format for provider %s", provider)
 	}
@@ -138,7 +140,7 @@ func (c *Config) GetSessionKey(provider string) (string, time.Time, error) {
 		return "", time.Time{}, err
 	}
 
-	return key, expiry, nil
+	return sessionKey, expiry, nil
 }
 
 func (c *Config) ClearAllSessionKeys() {
