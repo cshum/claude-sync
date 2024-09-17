@@ -28,6 +28,14 @@ func GetConfig() *Config {
 		}
 		instance.loadGlobalConfig()
 		instance.loadLocalConfig()
+
+		// Set default values if they don't exist
+		if instance.Get("claude_api_url") == nil {
+			instance.Set("claude_api_url", "https://api.claude.ai", false)
+		}
+		if instance.Get("active_provider") == nil {
+			instance.Set("active_provider", "claude.ai", false)
+		}
 	}
 	return instance
 }
@@ -66,7 +74,10 @@ func (c *Config) Get(key string) interface{} {
 	if value, ok := c.LocalConfig[key]; ok {
 		return value
 	}
-	return c.GlobalConfig[key]
+	if value, ok := c.GlobalConfig[key]; ok {
+		return value
+	}
+	return nil
 }
 
 func (c *Config) Set(key string, value interface{}, local bool) error {

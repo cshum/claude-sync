@@ -67,12 +67,21 @@ func (c *ClaudeAI) Login() (string, time.Time, error) {
 }
 
 func (c *ClaudeAI) verifySessionKey(sessionKey string) error {
-	// Make a test API call to verify the session key
-	// For example, we could try to fetch the user's organizations
-	oldSessionKey := c.getSessionKey()
+	// Store the current session key
+	currentSessionKey, err := c.getSessionKey()
+	if err != nil {
+		// If there's no current session key, that's fine, we'll just set it back to empty later
+		currentSessionKey = ""
+	}
+
+	// Temporarily set the new session key
 	c.setSessionKey(sessionKey)
-	_, err := c.GetOrganizations()
-	c.setSessionKey(oldSessionKey)
+
+	// Make a test API call to verify the session key
+	_, err = c.GetOrganizations()
+
+	// Restore the original session key
+	c.setSessionKey(currentSessionKey)
 
 	if err != nil {
 		return fmt.Errorf("failed to verify session key: %v", err)
@@ -85,12 +94,15 @@ func (c *ClaudeAI) setSessionKey(sessionKey string) {
 	c.config.Set("claude_ai_session_key", sessionKey, false)
 }
 
-func (c *ClaudeAI) getSessionKey() string {
-	sessionKey, ok := c.config.Get("claude_ai_session_key").(string)
-	if !ok {
-		return ""
+func (c *ClaudeAI) getSessionKey() (string, error) {
+	sessionKey, _, err := c.config.GetSessionKey("claude.ai")
+	if err != nil {
+		return "", fmt.Errorf("session key not found. Please run 'claudesync auth login' first")
 	}
-	return sessionKey
+	if sessionKey == "" {
+		return "", fmt.Errorf("empty session key. Please run 'claudesync auth login' to set a valid session key")
+	}
+	return sessionKey, nil
 }
 
 func (c *ClaudeAI) GetOrganizations() ([]providerapi.Organization, error) {
@@ -323,7 +335,11 @@ func (c *ClaudeAI) SendMessage(organizationID, chatID, prompt, timezone string) 
 		}
 
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Cookie", fmt.Sprintf("sessionKey=%s", c.getSessionKey()))
+		sessionKey, err := c.getSessionKey()
+		if err != nil {
+			return
+		}
+		req.Header.Set("Cookie", fmt.Sprintf("sessionKey=%s", sessionKey))
 		req.Header.Set("Accept", "text/event-stream")
 
 		resp, err := c.client.Do(req)
@@ -387,7 +403,12 @@ func (c *ClaudeAI) makeRequest(method, endpoint string, data interface{}) (*http
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0")
 	req.Header.Set("Accept-Encoding", "gzip")
-	req.Header.Set("Cookie", fmt.Sprintf("sessionKey=%s", c.getSessionKey()))
+
+	sessionKey, err := c.getSessionKey()
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Cookie", fmt.Sprintf("sessionKey=%s", sessionKey))
 
 	resp, err := c.client.Do(req)
 	if err != nil {

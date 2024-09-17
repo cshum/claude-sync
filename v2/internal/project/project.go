@@ -243,15 +243,24 @@ func setProject(c *cli.Context) error {
 
 func listProjects(c *cli.Context) error {
 	cfg := config.GetConfig()
-	prov, err := provider.GetProvider(cfg.Get("active_provider").(string), cfg)
+	providerName := cfg.Get("active_provider")
+	if providerName == nil {
+		return fmt.Errorf("active provider not set. Please run 'claudesync auth login' first")
+	}
+
+	prov, err := provider.GetProvider(providerName.(string), cfg)
 	if err != nil {
 		return err
 	}
 
-	organizationID := cfg.Get("active_organization_id").(string)
+	organizationID := cfg.Get("active_organization_id")
+	if organizationID == nil {
+		return fmt.Errorf("active organization not set. Please run 'claudesync organization set' first")
+	}
+
 	showAll := c.Bool("all")
 
-	projects, err := prov.GetProjects(organizationID, showAll)
+	projects, err := prov.GetProjects(organizationID.(string), showAll)
 	if err != nil {
 		return err
 	}
