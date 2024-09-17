@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -29,10 +30,67 @@ func NewClaudeAIProvider(cfg *config.Config) *ClaudeAI {
 }
 
 func (c *ClaudeAI) Login() (string, time.Time, error) {
-	// Implement login logic here
-	// This might involve prompting the user for credentials and making an API call
-	// Return the session key and expiry time
-	return "", time.Time{}, fmt.Errorf("not implemented")
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter your Claude.ai session key: ")
+	sessionKey, err := reader.ReadString('\n')
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to read session key: %v", err)
+	}
+	sessionKey = strings.TrimSpace(sessionKey)
+
+	fmt.Print("Enter the session expiry time (format: RFC3339, e.g., 2023-06-01T15:04:05Z): ")
+	expiryStr, err := reader.ReadString('\n')
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to read expiry time: %v", err)
+	}
+	expiryStr = strings.TrimSpace(expiryStr)
+
+	expiry, err := time.Parse(time.RFC3339, expiryStr)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("invalid expiry time format: %v", err)
+	}
+
+	// Verify the session key by making a test API call
+	err = c.verifySessionKey(sessionKey)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("session key verification failed: %v", err)
+	}
+
+	// Store the session key and expiry in the config
+	err = c.config.SetSessionKey("claude.ai", sessionKey, expiry)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to store session key: %v", err)
+	}
+
+	return sessionKey, expiry, nil
+}
+
+func (c *ClaudeAI) verifySessionKey(sessionKey string) error {
+	// Make a test API call to verify the session key
+	// For example, we could try to fetch the user's organizations
+	oldSessionKey := c.getSessionKey()
+	c.setSessionKey(sessionKey)
+	_, err := c.GetOrganizations()
+	c.setSessionKey(oldSessionKey)
+
+	if err != nil {
+		return fmt.Errorf("failed to verify session key: %v", err)
+	}
+
+	return nil
+}
+
+func (c *ClaudeAI) setSessionKey(sessionKey string) {
+	c.config.Set("claude_ai_session_key", sessionKey, false)
+}
+
+func (c *ClaudeAI) getSessionKey() string {
+	sessionKey, ok := c.config.Get("claude_ai_session_key").(string)
+	if !ok {
+		return ""
+	}
+	return sessionKey
 }
 
 func (c *ClaudeAI) GetOrganizations() ([]providerapi.Organization, error) {
@@ -343,9 +401,4 @@ func (c *ClaudeAI) makeRequest(method, endpoint string, data interface{}) (*http
 	}
 
 	return resp, nil
-}
-
-func (c *ClaudeAI) getSessionKey() string {
-	sessionKey, _, _ := c.config.GetSessionKey("claude.ai")
-	return sessionKey
 }
